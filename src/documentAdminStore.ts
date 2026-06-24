@@ -100,10 +100,20 @@ export const useDocumentAdminStore = create<DocumentAdminState>((set) => ({
   setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
-  setEditState: (editState) => set({ editState:editState as any}),
+  setEditState: (editState) =>
+    set((state) => ({
+      editState:
+        typeof editState === "function"
+          ? editState(state.editState)
+          : editState,
+    })),
   setSaving: (saving) => set({ saving }),
   setFormOpen: (formOpen) => set({ formOpen }),
-  setFormData: (formData) => set({ formData: formData as any }),
+  setFormData: (formData) =>
+    set((state) => ({
+      formData:
+        typeof formData === "function" ? formData(state.formData) : formData,
+    })),
   updateFormData: (patch) =>
     set((state) => ({ formData: { ...state.formData, ...patch } })),
   setDeleteTarget: (deleteTarget) => set({ deleteTarget }),
