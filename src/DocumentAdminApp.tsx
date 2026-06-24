@@ -9,10 +9,10 @@ import {
   type DocumentCategory,
   type DocumentItem,
   type DocumentStatus,
-  type DocumentsResponse,
   updateDocument,
 } from "./mockApi";
 import { useDocumentAdminStore } from "./documentAdminStore";
+import { useDocuments } from "./useDocuments";
 
 const statusOptions: DocumentStatus[] = [
   "Draft",
@@ -104,49 +104,14 @@ function DocumentAdminApp() {
     resetForm,
   } = useDocumentAdminStore();
 
+  useDocuments();
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 350);
     return () => window.clearTimeout(timer);
   }, [searchTerm, setDebouncedSearch]);
-
-  useEffect(() => {
-    const loadDocuments = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const response: DocumentsResponse = await getDocuments({
-          page,
-          pageSize: PAGE_SIZE,
-          search: debouncedSearch,
-          status: statusFilter,
-          category: categoryFilter,
-          role,
-          userId: currentUserId,
-        });
-        setDocuments(response.items);
-        setTotal(response.total);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load documents",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDocuments();
-  }, [
-    page,
-    debouncedSearch,
-    statusFilter,
-    categoryFilter,
-    setDocuments,
-    setError,
-    setLoading,
-    setTotal,
-  ]);
 
   const canDelete = role !== "STAFF";
 
