@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
@@ -7,12 +7,12 @@ import {
   getDocuments,
   importDocuments,
   type DocumentCategory,
-  type DocumentDraft,
   type DocumentItem,
   type DocumentStatus,
   type DocumentsResponse,
   updateDocument,
 } from "./mockApi";
+import { useDocumentAdminStore } from "./documentAdminStore";
 
 const statusOptions: DocumentStatus[] = [
   "Draft",
@@ -31,18 +31,10 @@ const PAGE_SIZE = 6;
 const role = "ADMIN" as "ADMIN" | "STAFF";
 const currentUserId = "alex";
 
-interface CellEditState {
-  id: string;
-  field: "code" | "title" | "category" | "status";
-  value: string;
-}
-
-interface ImportSummary {
-  inserted: number;
-  invalidRows: Array<{ row: number; reason: string }>;
-}
-
-const validateField = (field: CellEditState["field"], value: string) => {
+const validateField = (
+  field: "code" | "title" | "category" | "status",
+  value: string,
+) => {
   if (field === "code") {
     if (!value.trim()) return "Code is required";
     if (value.trim().length < 3) return "Code must be at least 3 characters";
@@ -68,40 +60,56 @@ const validateField = (field: CellEditState["field"], value: string) => {
 
 function DocumentAdminApp() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [editState, setEditState] = useState<CellEditState | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [formData, setFormData] = useState<DocumentDraft>({
-    code: "",
-    title: "",
-    category: "Policy",
-    status: "Draft",
-    createdBy: "Alex",
-    ownerId: currentUserId,
-  });
-  const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importSummary, setImportSummary] = useState<ImportSummary | null>(
-    null,
-  );
-  const [importProgress, setImportProgress] = useState(0);
-  const [importMessage, setImportMessage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const {
+    documents,
+    total,
+    page,
+    statusFilter,
+    categoryFilter,
+    loading,
+    error,
+    editState,
+    saving,
+    formOpen,
+    formData,
+    deleteTarget,
+    importing,
+    importSummary,
+    importProgress,
+    importMessage,
+    searchTerm,
+    debouncedSearch,
+    setDocuments,
+    setTotal,
+    setPage,
+    setStatusFilter,
+    setCategoryFilter,
+    setLoading,
+    setError,
+    setEditState,
+    setSaving,
+    setFormOpen,
+    setFormData,
+    updateFormData,
+    setDeleteTarget,
+    setImporting,
+    setImportSummary,
+    setImportProgress,
+    setImportMessage,
+    setSearchTerm,
+    setDebouncedSearch,
+    appendDocument,
+    replaceDocument,
+    removeDocument,
+    resetForm,
+  } = useDocumentAdminStore();
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 350);
     return () => window.clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, setDebouncedSearch]);
 
   useEffect(() => {
     const loadDocuments = async () => {
@@ -129,7 +137,16 @@ function DocumentAdminApp() {
     };
 
     loadDocuments();
-  }, [page, debouncedSearch, statusFilter, categoryFilter]);
+  }, [
+    page,
+    debouncedSearch,
+    statusFilter,
+    categoryFilter,
+    setDocuments,
+    setError,
+    setLoading,
+    setTotal,
+  ]);
 
   const canDelete = role !== "STAFF";
 
@@ -153,17 +170,10 @@ function DocumentAdminApp() {
     try {
       setSaving(true);
       const created = await createDocument(formData);
-      setDocuments((existing) => [created, ...existing]);
-      setTotal((value) => value + 1);
+      appendDocument(created);
+      setTotal(total + 1);
       setFormOpen(false);
-      setFormData({
-        code: "",
-        title: "",
-        category: "Policy",
-        status: "Draft",
-        createdBy: "Alex",
-        ownerId: currentUserId,
-      });
+      resetForm();
       setError("");
     } catch (err) {
       setError(
@@ -174,7 +184,10 @@ function DocumentAdminApp() {
     }
   }
 
-  const beginEdit = (doc: DocumentItem, field: CellEditState["field"]) => {
+  const beginEdit = (
+    doc: DocumentItem,
+    field: "code" | "title" | "category" | "status",
+  ) => {
     setEditState({ id: doc.id, field, value: doc[field] });
   };
 
@@ -191,9 +204,7 @@ function DocumentAdminApp() {
       const updated = await updateDocument(editState.id, {
         [editState.field]: editState.value,
       });
-      setDocuments((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      replaceDocument(updated);
       setEditState(null);
       setError("");
     } catch (err) {
@@ -208,10 +219,8 @@ function DocumentAdminApp() {
     try {
       setSaving(true);
       await deleteDocument(deleteTarget.id);
-      setDocuments((current) =>
-        current.filter((item) => item.id !== deleteTarget.id),
-      );
-      setTotal((current) => Math.max(0, current - 1));
+      removeDocument(deleteTarget.id);
+      setTotal(Math.max(0, total - 1));
       setDeleteTarget(null);
     } catch (err) {
       setError(
@@ -613,10 +622,7 @@ function DocumentAdminApp() {
                 <input
                   value={formData.code}
                   onChange={(event) =>
-                    setFormData((current) => ({
-                      ...current,
-                      code: event.target.value,
-                    }))
+                    updateFormData({ code: event.target.value })
                   }
                   required
                 />
@@ -626,10 +632,7 @@ function DocumentAdminApp() {
                 <input
                   value={formData.title}
                   onChange={(event) =>
-                    setFormData((current) => ({
-                      ...current,
-                      title: event.target.value,
-                    }))
+                    updateFormData({ title: event.target.value })
                   }
                   required
                 />
@@ -639,10 +642,9 @@ function DocumentAdminApp() {
                 <select
                   value={formData.category}
                   onChange={(event) =>
-                    setFormData((current) => ({
-                      ...current,
+                    updateFormData({
                       category: event.target.value as DocumentCategory,
-                    }))
+                    })
                   }
                 >
                   {categoryOptions.map((category) => (
@@ -657,10 +659,9 @@ function DocumentAdminApp() {
                 <select
                   value={formData.status}
                   onChange={(event) =>
-                    setFormData((current) => ({
-                      ...current,
+                    updateFormData({
                       status: event.target.value as DocumentStatus,
-                    }))
+                    })
                   }
                 >
                   {statusOptions.map((status) => (
@@ -675,10 +676,7 @@ function DocumentAdminApp() {
                 <input
                   value={formData.createdBy}
                   onChange={(event) =>
-                    setFormData((current) => ({
-                      ...current,
-                      createdBy: event.target.value,
-                    }))
+                    updateFormData({ createdBy: event.target.value })
                   }
                   required
                 />
