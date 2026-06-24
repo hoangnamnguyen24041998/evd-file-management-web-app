@@ -5,7 +5,9 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 export default defineConfig({
   plugins: [
     react(),
-    viteStaticCopy({ targets: [{ src: "public/mockServiceWorker.js", dest: "" }] }),
+    viteStaticCopy({
+      targets: [{ src: "public/mockServiceWorker.js", dest: "" }],
+    }),
   ],
-  base: "/evd-file-management-web-app/",
+  base: "./",
 });
