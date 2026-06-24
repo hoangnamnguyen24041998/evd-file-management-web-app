@@ -38,7 +38,7 @@ interface DocumentAdminState {
   debouncedSearch: string;
   setDocuments: (documents: DocumentItem[]) => void;
   setTotal: (total: number) => void;
-  setPage: (page: number) => void;
+  setPage: (page: StateUpdater<number>) => void;
   setStatusFilter: (status: string) => void;
   setCategoryFilter: (category: string) => void;
   setLoading: (loading: boolean) => void;
@@ -92,15 +92,18 @@ export const useDocumentAdminStore = create<DocumentAdminState>((set) => ({
   debouncedSearch: "",
   setDocuments: (documents) => set({ documents }),
   setTotal: (total) => set({ total }),
-  setPage: (page) => set({ page }),
+  setPage: (page) =>
+    set((state) => ({
+      page: typeof page === "function" ? page(state.page) : page,
+    })),
   setStatusFilter: (statusFilter) => set({ statusFilter }),
   setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
-  setEditState: (editState) => set({ editState }),
+  setEditState: (editState) => set({ editState:editState as any}),
   setSaving: (saving) => set({ saving }),
   setFormOpen: (formOpen) => set({ formOpen }),
-  setFormData: (formData) => set({ formData }),
+  setFormData: (formData) => set({ formData: formData as any }),
   updateFormData: (patch) =>
     set((state) => ({ formData: { ...state.formData, ...patch } })),
   setDeleteTarget: (deleteTarget) => set({ deleteTarget }),
